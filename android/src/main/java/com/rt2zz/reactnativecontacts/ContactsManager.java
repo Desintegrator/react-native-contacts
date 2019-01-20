@@ -1,25 +1,18 @@
 package com.rt2zz.reactnativecontacts;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ContentProviderOperation;
-import android.content.ContentProviderResult;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.ContentUris;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.Manifest;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.provider.ContactsContract;
 import android.provider.ContactsContract.CommonDataKinds;
 import android.provider.ContactsContract.CommonDataKinds.Organization;
 import android.provider.ContactsContract.CommonDataKinds.StructuredName;
-import android.provider.ContactsContract.CommonDataKinds.Note;
-import android.provider.ContactsContract.CommonDataKinds.Website;
 import android.provider.ContactsContract.RawContacts;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -30,14 +23,8 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
-import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableArray;
-import com.facebook.react.bridge.Arguments;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Hashtable;
 
@@ -175,17 +162,6 @@ public class ContactsManager extends ReactContextBaseJavaModule {
             }
         }
 
-        ReadableArray urlAddresses = contact.hasKey("urlAddresses") ? contact.getArray("urlAddresses") : null;
-        int numOfUrls = 0;
-        String[] urls = null;
-        if (urlAddresses != null) {
-            numOfUrls = urlAddresses.size();
-            urls = new String[numOfUrls];
-            for (int i = 0; i < numOfUrls; i++) {
-                urls[i] = urlAddresses.getMap(i).getString("url");
-            }
-        }
-
         ReadableArray emailAddresses = contact.hasKey("emailAddresses") ? contact.getArray("emailAddresses") : null;
         int numOfEmails = 0;
         String[] emails = null;
@@ -248,13 +224,6 @@ public class ContactsManager extends ReactContextBaseJavaModule {
         organization.put(Organization.DEPARTMENT, department);
         contactData.add(organization);
 
-        for (int i = 0; i < numOfUrls; i++) {
-            ContentValues url = new ContentValues();
-            url.put(ContactsContract.Data.MIMETYPE, CommonDataKinds.Website.CONTENT_ITEM_TYPE);
-            url.put(CommonDataKinds.Website.URL, urls[i]);
-            contactData.add(url);
-        }
-
         for (int i = 0; i < numOfEmails; i++) {
             ContentValues email = new ContentValues();
             email.put(ContactsContract.Data.MIMETYPE, CommonDataKinds.Email.CONTENT_ITEM_TYPE);
@@ -308,8 +277,10 @@ public class ContactsManager extends ReactContextBaseJavaModule {
         String company = contact.hasKey("company") ? contact.getString("company") : null;
         String jobTitle = contact.hasKey("jobTitle") ? contact.getString("jobTitle") : null;
         String department = contact.hasKey("department") ? contact.getString("department") : null;
-        String note = contact.hasKey("note") ? contact.getString("note") : null;
-        String thumbnailPath = contact.hasKey("thumbnailPath") ? contact.getString("thumbnailPath") : null;
+
+        // String name = givenName;
+        // name += middleName != "" ? " " + middleName : "";
+        // name += familyName != "" ? " " + familyName : "";
 
         ReadableArray phoneNumbers = contact.hasKey("phoneNumbers") ? contact.getArray("phoneNumbers") : null;
         int numOfPhones = 0;
@@ -323,17 +294,6 @@ public class ContactsManager extends ReactContextBaseJavaModule {
                 phones[i] = phoneNumbers.getMap(i).getString("number");
                 String label = phoneNumbers.getMap(i).getString("label");
                 phonesLabels[i] = mapStringToPhoneType(label);
-            }
-        }
-
-        ReadableArray urlAddresses = contact.hasKey("urlAddresses") ? contact.getArray("urlAddresses") : null;
-        int numOfUrls = 0;
-        String[] urls = null;
-        if (urlAddresses != null) {
-            numOfUrls = urlAddresses.size();
-            urls = new String[numOfUrls];
-            for (int i = 0; i < numOfUrls; i++) {
-                urls[i] = urlAddresses.getMap(i).getString("url");
             }
         }
 
@@ -369,12 +329,6 @@ public class ContactsManager extends ReactContextBaseJavaModule {
                 .withValue(StructuredName.PREFIX, prefix)
                 .withValue(StructuredName.SUFFIX, suffix);
         ops.add(op.build());
-        
-        op = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
-                .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                .withValue(ContactsContract.Data.MIMETYPE, Note.CONTENT_ITEM_TYPE)
-                .withValue(ContactsContract.CommonDataKinds.Note.NOTE, note);
-        ops.add(op.build());
 
         op = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                 .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
@@ -396,14 +350,6 @@ public class ContactsManager extends ReactContextBaseJavaModule {
             ops.add(op.build());
         }
 
-        for (int i = 0; i < numOfUrls; i++) {
-            op = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
-                    .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                    .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Website.CONTENT_ITEM_TYPE)
-                    .withValue(CommonDataKinds.Website.URL, urls[i]);
-            ops.add(op.build());
-        }
-
         for (int i = 0; i < numOfEmails; i++) {
             op = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                     .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
@@ -413,18 +359,6 @@ public class ContactsManager extends ReactContextBaseJavaModule {
             ops.add(op.build());
         }
 
-        if(thumbnailPath != null && !thumbnailPath.isEmpty()) {
-            Bitmap photo = BitmapFactory.decodeFile(thumbnailPath);
-
-            if(photo != null) {
-                ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
-                        .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                        .withValue(ContactsContract.Data.MIMETYPE,ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE)
-                        .withValue(ContactsContract.CommonDataKinds.Photo.PHOTO, toByteArray(photo))
-                        .build());
-            }
-        }
-    
         ReadableArray postalAddresses = contact.hasKey("postalAddresses") ? contact.getArray("postalAddresses") : null;
         if (postalAddresses != null) {
             for (int i = 0; i < postalAddresses.size(); i++) {
@@ -443,38 +377,23 @@ public class ContactsManager extends ReactContextBaseJavaModule {
                 ops.add(op.build());
             }
         }
-      
+
         Context ctx = getReactApplicationContext();
         try {
             ContentResolver cr = ctx.getContentResolver();
-            ContentProviderResult[] result = cr.applyBatch(ContactsContract.AUTHORITY, ops);
-
-            if(result != null && result.length > 0) {
-
-                String rawId = String.valueOf(ContentUris.parseId(result[0].uri));
-
-                ContactsProvider contactsProvider = new ContactsProvider(cr);
-                WritableMap newlyAddedContact = contactsProvider.getContactByRawId(rawId);
-
-                callback.invoke(null, newlyAddedContact); // success           
-            }      
+            cr.applyBatch(ContactsContract.AUTHORITY, ops);
+            callback.invoke(); // success
         } catch (Exception e) {
             callback.invoke(e.toString());
         }
     }
-
-    public byte[] toByteArray(Bitmap bitmap) {
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream);
-        return stream.toByteArray();       
-    }    
 
     /*
      * Update contact to phone's addressbook
      */
     @ReactMethod
     public void updateContact(ReadableMap contact, Callback callback) {
-        
+
         String recordID = contact.hasKey("recordID") ? contact.getString("recordID") : null;
         String rawContactId = contact.hasKey("rawContactId") ? contact.getString("rawContactId") : null;
 
@@ -486,8 +405,6 @@ public class ContactsManager extends ReactContextBaseJavaModule {
         String company = contact.hasKey("company") ? contact.getString("company") : null;
         String jobTitle = contact.hasKey("jobTitle") ? contact.getString("jobTitle") : null;
         String department = contact.hasKey("department") ? contact.getString("department") : null;
-        String note = contact.hasKey("note") ? contact.getString("note") : null;
-        String thumbnailPath = contact.hasKey("thumbnailPath") ? contact.getString("thumbnailPath") : null;
 
         ReadableArray phoneNumbers = contact.hasKey("phoneNumbers") ? contact.getArray("phoneNumbers") : null;
         int numOfPhones = 0;
@@ -507,22 +424,6 @@ public class ContactsManager extends ReactContextBaseJavaModule {
                 phones[i] = phoneNumber;
                 phonesLabels[i] = mapStringToPhoneType(phoneLabel);
                 phoneIds[i] = phoneId;
-            }
-        }
-
-        ReadableArray urlAddresses = contact.hasKey("urlAddresses") ? contact.getArray("urlAddresses") : null;
-        int numOfUrls = 0;
-        String[] urls = null;
-        String[] urlIds = null;
-
-        if (urlAddresses != null) {
-            numOfUrls = urlAddresses.size();
-            urls = new String[numOfUrls];
-            urlIds = new String[numOfUrls];
-            for (int i = 0; i < numOfUrls; i++) {
-                ReadableMap urlMap = urlAddresses.getMap(i);
-                urls[i] = urlMap.getString("url");
-                urlIds[i] = urlMap.hasKey("id") ? urlMap.getString("id") : null;
             }
         }
 
@@ -573,66 +474,36 @@ public class ContactsManager extends ReactContextBaseJavaModule {
 
         op.withYieldAllowed(true);
 
-        // remove existing phoneNumbers first
-        op = ContentProviderOperation.newDelete(ContactsContract.Data.CONTENT_URI)
-                .withSelection(
-                    ContactsContract.Data.MIMETYPE  + "=? AND "+ ContactsContract.Data.CONTACT_ID + " = ?", 
-                    new String[]{String.valueOf(CommonDataKinds.Phone.CONTENT_ITEM_TYPE), String.valueOf(recordID)}
-                );
-        ops.add(op.build());
-        
-        // add passed phonenumbers
         for (int i = 0; i < numOfPhones; i++) {
-            op = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
-                    .withValue(ContactsContract.Data.RAW_CONTACT_ID, String.valueOf(rawContactId))
-                    .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
-                    .withValue(CommonDataKinds.Phone.NUMBER, phones[i])
-                    .withValue(CommonDataKinds.Phone.TYPE, phonesLabels[i]);
-            ops.add(op.build());
-        }
-
-        for (int i = 0; i < numOfUrls; i++) {
-            if (urlIds[i] == null) {
+            if (phoneIds[i] == null) {
                 op = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                         .withValue(ContactsContract.Data.RAW_CONTACT_ID, String.valueOf(rawContactId))
-                        .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Website.CONTENT_ITEM_TYPE)
-                        .withValue(CommonDataKinds.Website.URL, urls[i]);
+                        .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                        .withValue(CommonDataKinds.Phone.NUMBER, phones[i])
+                        .withValue(CommonDataKinds.Phone.TYPE, phonesLabels[i]);
             } else {
                 op = ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI)
-                        .withSelection(ContactsContract.Data._ID + "=?", new String[]{String.valueOf(urlIds[i])})
-                        .withValue(CommonDataKinds.Website.URL, urls[i]);
+                        .withSelection(ContactsContract.Data._ID + "=?", new String[]{String.valueOf(phoneIds[i])})
+                        .withValue(CommonDataKinds.Phone.NUMBER, phones[i])
+                        .withValue(CommonDataKinds.Phone.TYPE, phonesLabels[i]);
             }
             ops.add(op.build());
         }
 
-        // remove existing emails first
-        op = ContentProviderOperation.newDelete(ContactsContract.Data.CONTENT_URI)
-                .withSelection(
-                    ContactsContract.Data.MIMETYPE  + "=? AND "+ ContactsContract.Data.CONTACT_ID + " = ?", 
-                    new String[]{String.valueOf(CommonDataKinds.Email.CONTENT_ITEM_TYPE), String.valueOf(recordID)}
-                );
-        ops.add(op.build());
-
-        // add passed email addresses
         for (int i = 0; i < numOfEmails; i++) {
-            op = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
-                    .withValue(ContactsContract.Data.RAW_CONTACT_ID, String.valueOf(rawContactId))
-                    .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Email.CONTENT_ITEM_TYPE)
-                    .withValue(CommonDataKinds.Email.ADDRESS, emails[i])
-                    .withValue(CommonDataKinds.Email.TYPE, emailsLabels[i]);
-            ops.add(op.build());
-        }
-
-         if(thumbnailPath != null && !thumbnailPath.isEmpty()) {
-            Bitmap photo = BitmapFactory.decodeFile(thumbnailPath);
-     
-            if(photo != null) {
-                ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
-                        .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                        .withValue(ContactsContract.Data.MIMETYPE,ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE)
-                        .withValue(ContactsContract.CommonDataKinds.Photo.PHOTO, toByteArray(photo))
-                        .build());
+            if (emailIds[i] == null) {
+                op = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                        .withValue(ContactsContract.Data.RAW_CONTACT_ID, String.valueOf(rawContactId))
+                        .withValue(ContactsContract.Data.MIMETYPE, CommonDataKinds.Email.CONTENT_ITEM_TYPE)
+                        .withValue(CommonDataKinds.Email.ADDRESS, emails[i])
+                        .withValue(CommonDataKinds.Email.TYPE, emailsLabels[i]);
+            } else {
+                op = ContentProviderOperation.newUpdate(ContactsContract.Data.CONTENT_URI)
+                        .withSelection(ContactsContract.Data._ID + "=?", new String[]{String.valueOf(emailIds[i])})
+                        .withValue(CommonDataKinds.Email.ADDRESS, emails[i])
+                        .withValue(CommonDataKinds.Email.TYPE, emailsLabels[i]);
             }
+            ops.add(op.build());
         }
 
         ReadableArray postalAddresses = contact.hasKey("postalAddresses") ? contact.getArray("postalAddresses") : null;
@@ -655,44 +526,13 @@ public class ContactsManager extends ReactContextBaseJavaModule {
         Context ctx = getReactApplicationContext();
         try {
             ContentResolver cr = ctx.getContentResolver();
-            ContentProviderResult[] result = cr.applyBatch(ContactsContract.AUTHORITY, ops);
-
-            if(result != null && result.length > 0) {
-
-                ContactsProvider contactsProvider = new ContactsProvider(cr);
-                WritableMap updatedContact = contactsProvider.getContactById(recordID);
-
-                callback.invoke(null, updatedContact); // success           
-            }      
+            cr.applyBatch(ContactsContract.AUTHORITY, ops);
+            callback.invoke(); // success
         } catch (Exception e) {
             callback.invoke(e.toString());
         }
     }
 
-    /*
-     * Update contact to phone's addressbook
-     */
-    @ReactMethod
-    public void deleteContact(ReadableMap contact, Callback callback) {
-
-        String recordID = contact.hasKey("recordID") ? contact.getString("recordID") : null;
-      
-        try {
-               Context ctx = getReactApplicationContext();
-
-               Uri uri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_URI,recordID);
-               ContentResolver cr = ctx.getContentResolver();
-               int deleted = cr.delete(uri,null,null);
-
-               if(deleted > 0)
-                 callback.invoke(null, recordID); // success
-               else
-                 callback.invoke(null, null); // something was wrong
-
-        } catch (Exception e) {
-            callback.invoke(e.toString(), null);
-        }
-    }
     /*
      * Check permission
      */
